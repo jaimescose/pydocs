@@ -1,15 +1,17 @@
 import shutil
+from typing import Literal
 import img2pdf
 import os
 from pathlib import Path
 import typer
 from PyPDF2 import PdfReader, PdfWriter
+from PIL import Image
 
 app = typer.Typer()
 
 # path = "C:/Users/57301/Documents/documents/palmanova/apto/Especificaciones técnicas del proyecto"
 
-IMAGE_EXTENSIONS = ['.jpg', '.jpeg']
+IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png']
 
 @app.command()
 def convert_images_to_pdf(folder_path: str):
@@ -56,6 +58,43 @@ def split_pdf(pdf_filename: str):
             writer.write(output_pdf)
         print(f"Saved: {output_filename}")
 
+
+@app.command()
+def rotate_pdf_page(pdf_filename: str, rotation: int):
+    print(rotation)
+    directory, filename = os.path.split(pdf_filename)
+    # Split the filename and extension
+    name, ext = os.path.splitext(filename)
+    # Create the new filename
+    output_path = os.path.join(directory, f"{name}_rotated{ext}")
+
+    reader = PdfReader(pdf_filename)
+    writer = PdfWriter()
+
+    for page in reader.pages:
+        page.rotate(rotation)
+        writer.add_page(page)
+
+    with open(output_path, "wb") as output_file:
+        writer.write(output_file)
+
+    print(f"Rotated PDF saved as: {output_path}")
+
+
+@app.command()
+def convert_webp_to_png(webp_filename: str):
+    try:
+        directory, filename = os.path.split(webp_filename)
+        name, ext = os.path.splitext(filename)
+        output_path = os.path.join(directory, f"{name}.png")
+
+        img = Image.open(webp_filename)
+        img.save(output_path)
+        print(f"Converted {webp_filename} to {output_path}")
+    except FileNotFoundError:
+        print(f"Error: File not found: {webp_filename}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 @app.command()
