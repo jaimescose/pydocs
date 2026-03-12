@@ -6,6 +6,8 @@ from pathlib import Path
 import typer
 from PyPDF2 import PdfReader, PdfWriter
 from PIL import Image
+from pillow_heif import register_heif_opener
+import subprocess
 
 app = typer.Typer()
 
@@ -100,6 +102,94 @@ def convert_webp_to_png(webp_filename: str):
 @app.command()
 def hello(name: str = 'pana'):
     print(f'¡Hola, {name.capitalize()}!')
+
+@app.command()
+def convert_heic_to_jpeg(input_path: str, recursive: bool = False):
+    """
+    Converts a HEIC image file or all .HEIC/.HEIF files in a folder to JPEG format.
+    Pass a file path to convert a single file, or a folder path to convert all HEIC files inside.
+    Use --recursive to search subdirectories.
+    """
+    try:
+        register_heif_opener()
+
+        path = Path(input_path)
+        if not path.exists():
+            print(f"Error: path not found: {input_path}")
+            return
+
+        heic_exts = {'.heic', '.heif'}
+        files = []
+
+        if path.is_dir():
+            if recursive:
+                files = [p for p in sorted(path.rglob('*')) if p.is_file() and p.suffix.lower() in heic_exts]
+            else:
+                files = [p for p in sorted(path.iterdir()) if p.is_file() and p.suffix.lower() in heic_exts]
+        else:
+            if path.suffix.lower() in heic_exts:
+                files = [path]
+            else:
+                print(f"Error: file is not a HEIC/HEIF: {input_path}")
+                return
+
+        if not files:
+            print(f"No HEIC/HEIF files found at: {input_path}")
+            return
+
+        for file in files:
+            try:
+                output_path = file.with_suffix('.jpeg')
+                img = Image.open(file)
+                # Ensure no alpha channel when saving as JPEG
+                if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                    img = img.convert("RGB")
+                img.save(output_path, "JPEG")
+                print(f"Converted {file} to {output_path}")
+            except FileNotFoundError:
+                print(f"Error: File not found: {file}")
+            except Exception as e:
+                print(f"Failed converting {file}: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+@app.command()
+def convert_wav_to_mp3(wav_filename: str, bitrate: str = "192k"):
+    """
+    Converts a WAV audio file to MP3.
+    Requires pydub and ffmpeg installed.
+    """
+    try:
+        directory, filename = os.path.split(wav_filename)
+        name, ext = os.path.splitext(filename)
+        output_path = os.path.join(directory, f"{name}.mp3")
+
+        # Try to use pydub if available (lazy import to avoid import-time failures)
+        try:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_wav(wav_filename)
+            audio.export(output_path, format="mp3", bitrate=bitrate)
+            print(f"Converted {wav_filename} to {output_path} (via pydub)")
+            return
+        except Exception:
+            # pydub/audioop not available or failed — fall back to ffmpeg CLI
+            pass
+
+        # Fallback: require ffmpeg available on PATH
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            print("ffmpeg not found and pydub unavailable. Install ffmpeg or ensure pydub and audioop/pyaudioop are installed.")
+            return
+
+        cmd = [ffmpeg, "-y", "-i", wav_filename, "-b:a", bitrate, output_path]
+        subprocess.run(cmd, check=True)
+        print(f"Converted {wav_filename} to {output_path} (via ffmpeg)")
+    except FileNotFoundError:
+        print(f"Error: File not found: {wav_filename}")
+    except subprocess.CalledProcessError as e:
+        print(f"ffmpeg failed: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 if __name__ == '__main__':
     app()

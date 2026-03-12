@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "img2pdf>=0.6.0",
+    "pillow-heif>=1.1.1",
+    "pydub>=0.25.1",
     "pypdf2>=3.0.1",
     "typer>=0.15.2",
 ]
